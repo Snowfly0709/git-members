@@ -14,16 +14,12 @@
   "contributes": {
     "commands": [
       {
-        "command": "gitmembers.helloWorld",
-        "title": "Hello World"
-      },
-      {
         "command": "gitmembers.ikun",
         "title": "ikun"
       },
       {
-        "command": "gitmembers.ikun",
-        "title": "ikun"
+        "command": "gitmembers.showGitBlame",
+        "title": "showGitBlame"
       }
     ]
   },
