@@ -47,6 +47,24 @@ export function activate(context: vscode.ExtensionContext) {
         }
     });
 
+    // 监听悬停事件
+    vscode.window.onDidChangeTextEditorSelection(async (event) => {
+        const editor = event.textEditor;
+        const selectedLine = editor.selection.active.line;
+
+        // 延迟3秒，确保用户在此行悬停超过3秒
+        await delay(3000);
+
+        // 获取悬停行的作者
+        const blameOutput = await getBlameForFile(editor.document.fileName);
+        const author = blameOutput[selectedLine];
+
+        if (author) {
+            // 根据作者设置代码行的透明度
+            highlightByAuthor(editor, blameOutput, author);
+        }
+    });
+    
     context.subscriptions.push(disposable);
 }
 
