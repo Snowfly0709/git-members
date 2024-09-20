@@ -1,8 +1,13 @@
 // The module 'vscode' contains the VS Code extensibility API
 // Import the module and reference it with the alias vscode in your code below
 import * as vscode from 'vscode';
-import { exec } from 'child_process';
+import { spawn } from 'child_process';
 import * as path from 'path';
+
+// 延时函数
+function delay(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
 
 // This method is called when your extension is activated
 // Your extension is activated the very first time the command is executed
@@ -22,7 +27,6 @@ export function activate(context: vscode.ExtensionContext) {
 	context.subscriptions.push(ikunCommand);
 
 	const disposable = vscode.commands.registerCommand('gitmembers.showGitBlame', async () => {
-        // Get the active text editor
         const editor = vscode.window.activeTextEditor;
         if (!editor) {
             vscode.window.showErrorMessage('No active editor. Open a file to use this command.');
@@ -31,59 +35,72 @@ export function activate(context: vscode.ExtensionContext) {
 
         const filePath = editor.document.fileName;
         try {
-            // Run git blame on the entire file
-            const blameOutput = await gitBlame(filePath);
+            // Get the blame information for the whole file
+            const blameOutput = await getBlameForFile(filePath);
             if (blameOutput) {
                 // Show the blame results in a new window
                 showBlameResults(blameOutput, editor.document);
             }
-        } catch (err) {
-            vscode.window.showErrorMessage(`Failed to run git blame: ${err.message}`);
+        } catch (err: unknown) {
+            const errorMessage = (err as Error).message || 'Unknown error occurred';
+            vscode.window.showErrorMessage(`Failed to run git blame: ${errorMessage}`);
         }
     });
 
     context.subscriptions.push(disposable);
 }
 
-// Run git blame on the whole file
-async function gitBlame(filePath: string): Promise<string> {
-    const blameCommand = `git blame --porcelain ${path.basename(filePath)}`;
-
+async function getBlameForFile(filePath: string): Promise<string[]> {
     return new Promise((resolve, reject) => {
-        exec(blameCommand, { cwd: path.dirname(filePath) }, (error, stdout, stderr) => {
-            if (error) {
-                return reject(error);
+        const blameCommand = spawn('git', ['blame', '--line-porcelain', path.basename(filePath)], { cwd: path.dirname(filePath) });
+
+        let output = '';
+        blameCommand.stdout.on('data', (data) => {
+            output += data.toString();
+        });
+
+        blameCommand.stderr.on('data', (data) => {
+            reject(new Error(data.toString()));
+        });
+
+        blameCommand.on('close', (code) => {
+            if (code === 0) {
+                const blameLines = parseBlameOutput(output);
+                resolve(blameLines);
+            } else {
+                reject(new Error(`git blame process exited with code ${code}`));
             }
-            resolve(stdout);
         });
     });
 }
 
-// Parse git blame output and display in a new text editor
-function showBlameResults(blameOutput: string, document: vscode.TextDocument) {
-    // Split the blame output into lines
+// Parse git blame output for the entire file
+function parseBlameOutput(blameOutput: string): string[] {
     const blameLines = blameOutput.split('\n').filter(line => line.startsWith('author '));
 
-    const blameInfo: { [key: number]: string } = {};
+    const parsedAuthors: string[] = [];
     let lineNumber = 0;
 
-    // Match each author line with a line number
     for (let i = 0; i < blameLines.length; i++) {
         if (blameLines[i].startsWith('author ')) {
-            blameInfo[lineNumber] = blameLines[i].replace('author ', '');
+            const author = blameLines[i].replace('author ', '');
+            parsedAuthors[lineNumber] = author;
             lineNumber++;
         }
     }
 
-    // Prepare the content with blame info
+    return parsedAuthors;
+}
+
+// Display the blame results in a new text editor
+function showBlameResults(blameOutput: string[], document: vscode.TextDocument) {
     let content = '';
     for (let i = 0; i < document.lineCount; i++) {
         const lineContent = document.lineAt(i).text;
-        const author = blameInfo[i] || 'Unknown';
+        const author = blameOutput[i] || 'Unknown';
         content += `${author.padEnd(20)} | ${lineContent}\n`;
     }
 
-    // Open a new text document to show the blame results
     vscode.workspace.openTextDocument({ content, language: 'plaintext' }).then(doc => {
         vscode.window.showTextDocument(doc);
     });
