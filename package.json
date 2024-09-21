@@ -2,7 +2,7 @@
   "name": "gitmembers",
   "displayName": "gitMembers",
   "description": "using git blame in a visualization way",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "engines": {
     "vscode": "^1.93.0"
   },

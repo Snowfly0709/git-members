@@ -15,6 +15,7 @@ let selectionListener: vscode.Disposable | undefined;
 let fullOpacityDecoration: vscode.TextEditorDecorationType | undefined;
 let reducedOpacityDecoration: vscode.TextEditorDecorationType | undefined;
 let isEnabled: boolean = false;  // 新增变量跟踪插件状态
+let currentHoverProvider: vscode.Disposable | undefined; // 跟踪当前的 hover 提供者
 
 // This method is called when your extension is activated
 // Your extension is activated the very first time the command is executed
@@ -142,8 +143,25 @@ function showBlameResults(blameOutput: string[], document: vscode.TextDocument) 
         content += `${author.padEnd(20)} | ${lineContent}\n`;
     }
 
-    vscode.workspace.openTextDocument({ content, language: 'plaintext' }).then(doc => {
-        vscode.window.showTextDocument(doc);
+    // 自动生成文件名，使用原文件名加上时间戳
+    const fileName = path.basename(document.fileName, path.extname(document.fileName));
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-'); // 格式化时间戳
+    const newFileName = `${fileName}-blame-${timestamp}.txt`;
+
+    // 创建一个 Uri 来命名虚拟文件
+    const newFileUri = vscode.Uri.parse(`untitled:${newFileName}`);
+
+    // 打开具有特定文件名的虚拟文件
+    vscode.workspace.openTextDocument(newFileUri).then(doc => {
+        const edit = new vscode.WorkspaceEdit();
+        edit.insert(newFileUri, new vscode.Position(0, 0), content);
+        return vscode.workspace.applyEdit(edit).then(success => {
+            if (success) {
+                vscode.window.showTextDocument(doc);
+            } else {
+                vscode.window.showErrorMessage('Error opening blame results');
+            }
+        });
     });
 }
 
@@ -185,17 +203,26 @@ function highlightByAuthor(editor: vscode.TextEditor, blameOutput: string[], aut
     editor.setDecorations(fullOpacityDecoration, fullOpacityRanges);
     editor.setDecorations(reducedOpacityDecoration, reducedOpacityRanges);
 
-    // 注册 hover 提供者
-    vscode.languages.registerHoverProvider({ scheme: 'file', language: editor.document.languageId }, {
+    // 清除之前的 hover 提供者
+    if (currentHoverProvider) {
+        currentHoverProvider.dispose();
+    }
+
+    // 注册新的 hover 提供者
+    currentHoverProvider = vscode.languages.registerHoverProvider({ scheme: 'file', language: editor.document.languageId }, {
         provideHover(document, position) {
             const line = position.line;
             const lineAuthor = blameOutput[line];
+
+            // 检查当前行是否在全不透明范围内
             if (fullOpacityRanges.some(range => range.contains(position))) {
                 return new vscode.Hover(`Author: ${lineAuthor}`);
             }
+
+            return undefined; // 返回 undefined，以便不显示信息
         }
     });
-    
+
 }
 
 // This method is called when your extension is deactivated

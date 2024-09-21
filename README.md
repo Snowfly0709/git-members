@@ -33,5 +33,9 @@ Initial release
 2. Add author info when hovering.
 3. Use Alt+Ctrl+Z to stands for membersInTxT.Use Alt+Ctrl+X to stands for membersRealTime.
 4. Commands are still usable.
+
+### 1.0.2
+1. fix the re-occurance of author.
+2. change the name of txt.
 ---
 
