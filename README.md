@@ -7,7 +7,7 @@ This extention contains visible feature for git blame during your coding.
 
 ## Requirements
 
-No requirements
+VSCode version:1.93.0
 
 ## Extension Settings
 
