@@ -123,6 +123,34 @@ function showBlameResults(blameOutput: string[], document: vscode.TextDocument) 
         vscode.window.showTextDocument(doc);
     });
 }
+// 根据作者设置行的透明度
+function highlightByAuthor(editor: vscode.TextEditor, blameOutput: string[], author: string) {
+    const fullOpacityDecoration = vscode.window.createTextEditorDecorationType({
+        opacity: '1'
+    });
+
+    const reducedOpacityDecoration = vscode.window.createTextEditorDecorationType({
+        opacity: '0.5'
+    });
+
+    const fullOpacityRanges: vscode.Range[] = [];
+    const reducedOpacityRanges: vscode.Range[] = [];
+
+    for (let i = 0; i < blameOutput.length; i++) {
+        const lineAuthor = blameOutput[i];
+        const range = new vscode.Range(i, 0, i, editor.document.lineAt(i).text.length);
+        
+        if (lineAuthor === author) {
+            fullOpacityRanges.push(range);
+        } else {
+            reducedOpacityRanges.push(range);
+        }
+    }
+
+    // Apply decorations
+    editor.setDecorations(fullOpacityDecoration, fullOpacityRanges);
+    editor.setDecorations(reducedOpacityDecoration, reducedOpacityRanges);
+}
 
 // This method is called when your extension is deactivated
 export function deactivate() {}
