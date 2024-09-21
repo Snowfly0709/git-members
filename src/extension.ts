@@ -158,11 +158,11 @@ function highlightByAuthor(editor: vscode.TextEditor, blameOutput: string[], aut
     }
 
     fullOpacityDecoration = vscode.window.createTextEditorDecorationType({
-        backgroundColor: 'rgba(255, 255, 0, 0.3)'  // 黄色背景
+        opacity: '1'  // 黄色背景
     });
 
     reducedOpacityDecoration = vscode.window.createTextEditorDecorationType({
-        backgroundColor: 'rgba(128, 128, 128, 0.3)'  // 灰色背景
+        opacity: '0.5'  // 灰色背景
     });
 
     const fullOpacityRanges: vscode.Range[] = [];
@@ -174,15 +174,28 @@ function highlightByAuthor(editor: vscode.TextEditor, blameOutput: string[], aut
 
         if (lineAuthor === author) {
             fullOpacityRanges.push(range);
-            console.log(`Highlighting line ${i} for author: ${author}`);
+            console.log(`Highlighting line ${i} with full opacity for author: ${author}`);
         } else {
             reducedOpacityRanges.push(range);
             console.log(`Dimming line ${i} for author: ${lineAuthor}`);
         }
     }
 
+    // 应用新的装饰
     editor.setDecorations(fullOpacityDecoration, fullOpacityRanges);
     editor.setDecorations(reducedOpacityDecoration, reducedOpacityRanges);
+
+    // 注册 hover 提供者
+    vscode.languages.registerHoverProvider({ scheme: 'file', language: editor.document.languageId }, {
+        provideHover(document, position) {
+            const line = position.line;
+            const lineAuthor = blameOutput[line];
+            if (fullOpacityRanges.some(range => range.contains(position))) {
+                return new vscode.Hover(`Author: ${lineAuthor}`);
+            }
+        }
+    });
+    
 }
 
 // This method is called when your extension is deactivated

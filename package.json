@@ -2,7 +2,7 @@
   "name": "gitmembers",
   "displayName": "gitMembers",
   "description": "using git blame in a visualization way",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "engines": {
     "vscode": "^1.93.0"
   },
@@ -22,6 +22,18 @@
         "command": "gitmembers.members",
         "title": "membersRealTime"
       }
+    ],
+    "keybindings": [
+        {
+            "command": "gitmembers.showGitBlameInTxT",
+            "key": "alt+ctrl+z",
+            "when": "editorTextFocus"
+        },
+        {
+            "command": "gitmembers.members",
+            "key": "alt+ctrl+x",
+            "when": "editorTextFocus"
+        }
     ]
   },
   "scripts": {

@@ -23,11 +23,15 @@ No known issues
 ## Release Notes
 
 
-
 ### 1.0.0
 
 Initial release
 
+### 1.0.1
 
+1. Changing highlight into opacity.
+2. Add author info when hovering.
+3. Use Alt+Ctrl+Z to stands for membersInTxT.Use Alt+Ctrl+X to stands for membersRealTime.
+4. Commands are still usable.
 ---
 
