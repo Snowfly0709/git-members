@@ -9,6 +9,13 @@ function delay(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+let hoverTimeout: NodeJS.Timeout | undefined;
+// 监听器变量
+let selectionListener: vscode.Disposable | undefined;
+let fullOpacityDecoration: vscode.TextEditorDecorationType | undefined;
+let reducedOpacityDecoration: vscode.TextEditorDecorationType | undefined;
+let isEnabled: boolean = false;  // 新增变量跟踪插件状态
+
 // This method is called when your extension is activated
 // Your extension is activated the very first time the command is executed
 export function activate(context: vscode.ExtensionContext) {
@@ -21,12 +28,7 @@ export function activate(context: vscode.ExtensionContext) {
 	// Now provide the implementation of the command with registerCommand
 	// The commandId parameter must match the command field in package.json
 
-	const ikunCommand = vscode.commands.registerCommand('gitmembers.ikun', () => {
-		vscode.window.showInformationMessage('You are ikun!');
-	});
-	context.subscriptions.push(ikunCommand);
-
-	const disposable = vscode.commands.registerCommand('gitmembers.showGitBlame', async () => {
+	const disposable = vscode.commands.registerCommand('gitmembers.showGitBlameInTxT', async () => {
         const editor = vscode.window.activeTextEditor;
         if (!editor) {
             vscode.window.showErrorMessage('No active editor. Open a file to use this command.');
@@ -47,25 +49,46 @@ export function activate(context: vscode.ExtensionContext) {
         }
     });
 
-    // 监听悬停事件
-    vscode.window.onDidChangeTextEditorSelection(async (event) => {
-        const editor = event.textEditor;
-        const selectedLine = editor.selection.active.line;
-
-        // 延迟3秒，确保用户在此行悬停超过3秒
-        await delay(3000);
-
-        // 获取悬停行的作者
-        const blameOutput = await getBlameForFile(editor.document.fileName);
-        const author = blameOutput[selectedLine];
-
-        if (author) {
-            // 根据作者设置代码行的透明度
-            highlightByAuthor(editor, blameOutput, author);
+    const toggleDisposable = vscode.commands.registerCommand('gitmembers.members', () => {
+        isEnabled = !isEnabled;  // 切换状态
+        vscode.window.showInformationMessage(`GitMembers plugin has been ${isEnabled ? 'enabled' : 'disabled'}.`);
+        if (!isEnabled) {
+            deactivate();  // 禁用时调用 deactivate
+        } else {
+            enableRealTimeBlame();  // 启用时调用
         }
     });
-    
-    context.subscriptions.push(disposable);
+
+    context.subscriptions.push(toggleDisposable);
+}
+
+function enableRealTimeBlame() {
+    if (selectionListener) {
+        selectionListener.dispose();  // 确保没有重复的监听器
+    }
+
+    selectionListener = vscode.window.onDidChangeTextEditorSelection((event) => {
+        if (!isEnabled) return;  // 检查插件是否启用
+
+        const editor = event.textEditor;
+        if (!editor) return;
+
+        if (hoverTimeout) {
+            clearTimeout(hoverTimeout);
+        }
+
+        const selectedLine = editor.selection.active.line;
+
+        hoverTimeout = setTimeout(async () => {
+            const blameOutput = await getBlameForFile(editor.document.fileName);
+            const author = blameOutput[selectedLine];
+            console.log(`Selected Line: ${selectedLine}, Author: ${author}`);
+
+            if (author) {
+                highlightByAuthor(editor, blameOutput, author);
+            }
+        }, 1000);
+    });
 }
 
 async function getBlameForFile(filePath: string): Promise<string[]> {
@@ -123,14 +146,23 @@ function showBlameResults(blameOutput: string[], document: vscode.TextDocument) 
         vscode.window.showTextDocument(doc);
     });
 }
-// 根据作者设置行的透明度
+
 function highlightByAuthor(editor: vscode.TextEditor, blameOutput: string[], author: string) {
-    const fullOpacityDecoration = vscode.window.createTextEditorDecorationType({
-        opacity: '1'
+    if (!isEnabled) return;  // 检查插件是否启用
+
+    if (fullOpacityDecoration) {
+        editor.setDecorations(fullOpacityDecoration, []);
+    }
+    if (reducedOpacityDecoration) {
+        editor.setDecorations(reducedOpacityDecoration, []);
+    }
+
+    fullOpacityDecoration = vscode.window.createTextEditorDecorationType({
+        backgroundColor: 'rgba(255, 255, 0, 0.3)'  // 黄色背景
     });
 
-    const reducedOpacityDecoration = vscode.window.createTextEditorDecorationType({
-        opacity: '0.5'
+    reducedOpacityDecoration = vscode.window.createTextEditorDecorationType({
+        backgroundColor: 'rgba(128, 128, 128, 0.3)'  // 灰色背景
     });
 
     const fullOpacityRanges: vscode.Range[] = [];
@@ -139,18 +171,39 @@ function highlightByAuthor(editor: vscode.TextEditor, blameOutput: string[], aut
     for (let i = 0; i < blameOutput.length; i++) {
         const lineAuthor = blameOutput[i];
         const range = new vscode.Range(i, 0, i, editor.document.lineAt(i).text.length);
-        
+
         if (lineAuthor === author) {
             fullOpacityRanges.push(range);
+            console.log(`Highlighting line ${i} for author: ${author}`);
         } else {
             reducedOpacityRanges.push(range);
+            console.log(`Dimming line ${i} for author: ${lineAuthor}`);
         }
     }
 
-    // Apply decorations
     editor.setDecorations(fullOpacityDecoration, fullOpacityRanges);
     editor.setDecorations(reducedOpacityDecoration, reducedOpacityRanges);
 }
 
 // This method is called when your extension is deactivated
-export function deactivate() {}
+// 禁用插件
+export function deactivate() {
+    if (hoverTimeout) {
+        clearInterval(hoverTimeout);
+    }
+    // 清除高亮装饰
+    if (fullOpacityDecoration) {
+        vscode.window.activeTextEditor?.setDecorations(fullOpacityDecoration, []);
+        fullOpacityDecoration = undefined;
+    }
+    if (reducedOpacityDecoration) {
+        vscode.window.activeTextEditor?.setDecorations(reducedOpacityDecoration, []);
+        reducedOpacityDecoration = undefined;
+    }
+
+    // 移除事件监听器
+    if (selectionListener) {
+        selectionListener.dispose();
+        selectionListener = undefined;
+    }
+}
