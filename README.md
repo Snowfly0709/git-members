@@ -37,5 +37,6 @@ Initial release
 ### 1.0.2
 1. fix the re-occurance of author.
 2. change the name of txt.
+3. Add an icon.
 ---
 

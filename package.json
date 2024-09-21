@@ -1,5 +1,6 @@
 {
   "name": "gitmembers",
+  "icon": "image/avatar.png",
   "displayName": "gitMembers",
   "description": "using git blame in a visualization way",
   "version": "1.0.2",
